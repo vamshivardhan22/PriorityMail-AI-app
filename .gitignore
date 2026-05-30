@@ -3,6 +3,7 @@ credentials/*.json
 __pycache__/
 *.pyc
 .env
+.streamlit/secrets.toml
 data/*.db
 data/*.sqlite
 data/*.sqlite3

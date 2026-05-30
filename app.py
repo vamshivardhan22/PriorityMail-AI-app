@@ -180,9 +180,13 @@ def main():
         st.header('Controls')
         if st.button('Refresh Inbox', use_container_width=True):
             with st.spinner('Fetching latest Gmail messages...'):
-                fetch_emails()
-            st.cache_data.clear()
-            st.success('Inbox refreshed.')
+                try:
+                    fetch_emails()
+                except Exception as exc:
+                    st.error(str(exc))
+                else:
+                    st.cache_data.clear()
+                    st.success('Inbox refreshed.')
 
         options = get_filter_options()
         category = st.selectbox('Category', ['All'] + options['categories'])
@@ -204,11 +208,15 @@ def main():
         st.metric('Max Results', automation_config['max_results'])
         if st.button('Run Once', use_container_width=True):
             with st.spinner('Running automation cycle...'):
-                automation_result = run_once(verbose=False)
-            st.success(
-                f"Fetched {automation_result['fetch']['fetched']} emails, "
-                f"synced {automation_result['alert_count']} alerts."
-            )
+                try:
+                    automation_result = run_once(verbose=False)
+                except Exception as exc:
+                    st.error(str(exc))
+                else:
+                    st.success(
+                        f"Fetched {automation_result['fetch']['fetched']} emails, "
+                        f"synced {automation_result['alert_count']} alerts."
+                    )
 
         st.divider()
         st.subheader('Gmail Labels')

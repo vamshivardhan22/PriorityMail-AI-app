@@ -64,6 +64,46 @@ http://10.90.98.226:8501
 
 If the page does not load on mobile, allow Python or Streamlit through Windows Firewall for private networks.
 
+## Streamlit Cloud Gmail Setup
+
+Deploy the app with:
+
+```text
+Main file path: app.py
+```
+
+Do not upload `credentials/credentials.json` or `token.json` to GitHub.
+
+First create `token.json` locally:
+
+```powershell
+python worker.py --once
+```
+
+Then print the Gmail token in Streamlit Secrets format:
+
+```powershell
+python .\scripts\export_gmail_token.py
+```
+
+Copy the output into Streamlit Cloud under **App settings > Secrets**. It should look like:
+
+```toml
+[gmail]
+token_json = '''
+{
+  "token": "...",
+  "refresh_token": "...",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "client_id": "...",
+  "client_secret": "...",
+  "scopes": ["https://www.googleapis.com/auth/gmail.modify"]
+}
+'''
+```
+
+After saving secrets, reboot the Streamlit Cloud app and use **Refresh Inbox**.
+
 ## Configuration
 
 Copy `.env.example` to `.env`, then fill in any values you need:

@@ -29,6 +29,47 @@ CREDENTIALS_PATH = os.path.join(BASE_DIR, 'credentials', 'credentials.json')
 TOKEN_PATH = os.path.join(BASE_DIR, 'token.json')
 
 
+def get_streamlit_gmail_secret(name):
+    try:
+        import streamlit as st
+    except Exception:
+        return ''
+
+    try:
+        gmail_secrets = st.secrets.get('gmail', {})
+    except Exception:
+        return ''
+
+    return gmail_secrets.get(name, '')
+
+
+def parse_json_value(value, source_name):
+    if not value:
+        return None
+
+    if isinstance(value, dict):
+        return dict(value)
+
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{source_name} is not valid JSON.") from exc
+
+
+def load_secret_token_info():
+    return parse_json_value(
+        get_streamlit_gmail_secret('token_json'),
+        'Streamlit secret gmail.token_json',
+    )
+
+
+def load_secret_credentials_info():
+    return parse_json_value(
+        get_streamlit_gmail_secret('credentials_json'),
+        'Streamlit secret gmail.credentials_json',
+    )
+
+
 def format_gmail_timestamp(internal_date):
     if not internal_date:
         return None
@@ -70,6 +111,10 @@ def validate_credentials_file():
 
 
 def token_has_required_scopes():
+    token_info = load_secret_token_info()
+    if token_info:
+        return token_info_has_required_scopes(token_info)
+
     if not os.path.exists(TOKEN_PATH):
         return False
 
@@ -79,6 +124,10 @@ def token_has_required_scopes():
     except json.JSONDecodeError:
         return False
 
+    return token_info_has_required_scopes(token_data)
+
+
+def token_info_has_required_scopes(token_data):
     scope_value = token_data.get('scope', '')
     granted_scopes = set(scope_value.split())
     granted_scopes.update(token_data.get('scopes', []))
@@ -88,15 +137,24 @@ def token_has_required_scopes():
 
 def authenticate_gmail():
     creds = None
+    token_info = load_secret_token_info()
+    secret_credentials_info = load_secret_credentials_info()
 
-    # Token file stores login session
-    if token_has_required_scopes():
+    if token_info and token_info_has_required_scopes(token_info):
+        creds = Credentials.from_authorized_user_info(token_info, SCOPES)
+    elif token_has_required_scopes():
         creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
 
     # Login if no valid credentials
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+        elif token_info or secret_credentials_info:
+            raise RuntimeError(
+                "Gmail is not fully configured for Streamlit Cloud. Add a "
+                "valid gmail.token_json secret generated from your local "
+                "token.json file."
+            )
         else:
             validate_credentials_file()
 
@@ -106,9 +164,9 @@ def authenticate_gmail():
             )
             creds = flow.run_local_server(port=0)
 
-        # Save token
-        with open(TOKEN_PATH, 'w') as token:
-            token.write(creds.to_json())
+        if not token_info:
+            with open(TOKEN_PATH, 'w') as token:
+                token.write(creds.to_json())
 
     service = build('gmail', 'v1', credentials=creds)
 

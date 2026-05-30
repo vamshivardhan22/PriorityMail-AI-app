@@ -1,0 +1,9 @@
+token.json
+credentials/*.json
+__pycache__/
+*.pyc
+.env
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+logs/

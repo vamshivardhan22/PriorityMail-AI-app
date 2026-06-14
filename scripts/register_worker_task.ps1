@@ -18,7 +18,7 @@ if (-not (Test-Path $WorkerScript)) {
 
 $Action = New-ScheduledTaskAction `
     -Execute 'powershell.exe' `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$WorkerScript`"" `
+    -Argument "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$WorkerScript`"" `
     -WorkingDirectory $ProjectRoot
 
 $Trigger = New-ScheduledTaskTrigger `

@@ -135,6 +135,51 @@ def token_info_has_required_scopes(token_data):
     return all(scope in granted_scopes for scope in SCOPES)
 
 
+def has_streamlit_token():
+    token_info = load_secret_token_info()
+    return bool(token_info and token_info_has_required_scopes(token_info))
+
+
+def has_local_token():
+    return os.path.exists(TOKEN_PATH) and token_has_required_scopes()
+
+
+def reset_local_gmail_token():
+    if os.path.exists(TOKEN_PATH):
+        os.remove(TOKEN_PATH)
+        return True
+
+    return False
+
+
+def get_configured_gmail_account():
+    if not has_streamlit_token() and not has_local_token():
+        return {
+            'configured': False,
+            'email': '',
+            'source': '',
+            'error': '',
+        }
+
+    try:
+        service = authenticate_gmail()
+        profile = service.users().getProfile(userId='me').execute()
+    except Exception as exc:
+        return {
+            'configured': True,
+            'email': '',
+            'source': 'Streamlit secrets' if has_streamlit_token() else 'local token.json',
+            'error': str(exc),
+        }
+
+    return {
+        'configured': True,
+        'email': profile.get('emailAddress', ''),
+        'source': 'Streamlit secrets' if has_streamlit_token() else 'local token.json',
+        'error': '',
+    }
+
+
 def authenticate_gmail():
     creds = None
     token_info = load_secret_token_info()

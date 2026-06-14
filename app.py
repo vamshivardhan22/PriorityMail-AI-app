@@ -18,7 +18,12 @@ from services.database_service import (
 from services.alert_service import rebuild_alerts
 from services.automation_service import load_automation_config, run_once
 from services.career_service import rebuild_career_tracker
-from services.gmail_service import fetch_emails
+from services.gmail_service import (
+    fetch_emails,
+    get_configured_gmail_account,
+    has_streamlit_token,
+    reset_local_gmail_token,
+)
 from services.label_service import apply_labels_to_saved_emails
 from services.whatsapp_service import (
     send_test_message,
@@ -171,6 +176,36 @@ def render_alerts(alerts):
                     st.rerun()
 
 
+def render_gmail_account_controls():
+    st.subheader('Gmail Account')
+    account = get_configured_gmail_account()
+
+    if account['email']:
+        st.success(account['email'])
+        st.caption(f"Connected from {account['source']}.")
+    elif account['configured']:
+        st.warning('Gmail token found, but account could not be verified.')
+        if account['error']:
+            st.caption(account['error'])
+    else:
+        st.info('No Gmail account connected yet.')
+
+    if has_streamlit_token():
+        st.caption(
+            'This deployed app uses Gmail credentials from Streamlit secrets. '
+            'Update the gmail.token_json secret to switch accounts.'
+        )
+        return
+
+    if st.button('Use Different Gmail Account', use_container_width=True):
+        removed = reset_local_gmail_token()
+        if removed:
+            st.success('Gmail account disconnected. Click Refresh Inbox to sign in again.')
+        else:
+            st.info('No saved Gmail account was found. Click Refresh Inbox to sign in.')
+        st.rerun()
+
+
 def main():
     init_db()
 
@@ -178,6 +213,9 @@ def main():
 
     with st.sidebar:
         st.header('Controls')
+        render_gmail_account_controls()
+        st.divider()
+
         if st.button('Refresh Inbox', use_container_width=True):
             with st.spinner('Fetching latest Gmail messages...'):
                 try:

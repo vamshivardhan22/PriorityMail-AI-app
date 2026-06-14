@@ -27,6 +27,7 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CREDENTIALS_PATH = os.path.join(BASE_DIR, 'credentials', 'credentials.json')
 TOKEN_PATH = os.path.join(BASE_DIR, 'token.json')
+SESSION_TOKEN_KEY = 'gmail_token_info'
 
 
 def get_streamlit_gmail_secret(name):
@@ -41,6 +42,19 @@ def get_streamlit_gmail_secret(name):
         return ''
 
     return gmail_secrets.get(name, '')
+
+
+def get_streamlit_session_token_info():
+    try:
+        import streamlit as st
+    except Exception:
+        return None
+
+    token_info = st.session_state.get(SESSION_TOKEN_KEY)
+    if isinstance(token_info, dict):
+        return dict(token_info)
+
+    return None
 
 
 def parse_json_value(value, source_name):
@@ -61,6 +75,14 @@ def load_secret_token_info():
         get_streamlit_gmail_secret('token_json'),
         'Streamlit secret gmail.token_json',
     )
+
+
+def load_session_token_info():
+    return get_streamlit_session_token_info()
+
+
+def load_token_info():
+    return load_secret_token_info() or load_session_token_info()
 
 
 def load_secret_credentials_info():
@@ -111,7 +133,7 @@ def validate_credentials_file():
 
 
 def token_has_required_scopes():
-    token_info = load_secret_token_info()
+    token_info = load_token_info()
     if token_info:
         return token_info_has_required_scopes(token_info)
 
@@ -140,6 +162,11 @@ def has_streamlit_token():
     return bool(token_info and token_info_has_required_scopes(token_info))
 
 
+def has_session_token():
+    token_info = load_session_token_info()
+    return bool(token_info and token_info_has_required_scopes(token_info))
+
+
 def has_local_token():
     return os.path.exists(TOKEN_PATH) and token_has_required_scopes()
 
@@ -152,8 +179,52 @@ def reset_local_gmail_token():
     return False
 
 
+def set_session_gmail_token(token_value):
+    token_info = parse_json_value(token_value, 'Gmail token')
+    if not token_info:
+        raise ValueError('Paste or upload a Gmail token JSON file.')
+
+    if not token_info_has_required_scopes(token_info):
+        raise ValueError(
+            'This Gmail token does not include the required Gmail modify scope.'
+        )
+
+    try:
+        import streamlit as st
+    except Exception as exc:
+        raise RuntimeError('Streamlit session storage is not available.') from exc
+
+    st.session_state[SESSION_TOKEN_KEY] = token_info
+    return token_info
+
+
+def clear_session_gmail_token():
+    try:
+        import streamlit as st
+    except Exception:
+        return False
+
+    if SESSION_TOKEN_KEY in st.session_state:
+        del st.session_state[SESSION_TOKEN_KEY]
+        return True
+
+    return False
+
+
+def get_gmail_token_source():
+    if has_streamlit_token():
+        return 'Streamlit secrets'
+    if has_session_token():
+        return 'current app session'
+    if has_local_token():
+        return 'local token.json'
+
+    return ''
+
+
 def get_configured_gmail_account():
-    if not has_streamlit_token() and not has_local_token():
+    source = get_gmail_token_source()
+    if not source:
         return {
             'configured': False,
             'email': '',
@@ -168,21 +239,21 @@ def get_configured_gmail_account():
         return {
             'configured': True,
             'email': '',
-            'source': 'Streamlit secrets' if has_streamlit_token() else 'local token.json',
+            'source': source,
             'error': str(exc),
         }
 
     return {
         'configured': True,
         'email': profile.get('emailAddress', ''),
-        'source': 'Streamlit secrets' if has_streamlit_token() else 'local token.json',
+        'source': source,
         'error': '',
     }
 
 
 def authenticate_gmail():
     creds = None
-    token_info = load_secret_token_info()
+    token_info = load_token_info()
     secret_credentials_info = load_secret_credentials_info()
 
     if token_info and token_info_has_required_scopes(token_info):

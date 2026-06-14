@@ -19,10 +19,12 @@ from services.alert_service import rebuild_alerts
 from services.automation_service import load_automation_config, run_once
 from services.career_service import rebuild_career_tracker
 from services.gmail_service import (
+    clear_session_gmail_token,
     fetch_emails,
     get_configured_gmail_account,
     has_streamlit_token,
     reset_local_gmail_token,
+    set_session_gmail_token,
 )
 from services.label_service import apply_labels_to_saved_emails
 from services.whatsapp_service import (
@@ -197,8 +199,35 @@ def render_gmail_account_controls():
         )
         return
 
+    with st.expander('Add Gmail Account', expanded=not account['configured']):
+        uploaded_token = st.file_uploader(
+            'Upload token.json',
+            type='json',
+            accept_multiple_files=False,
+        )
+        pasted_token = st.text_area(
+            'Or paste token JSON',
+            placeholder='{"token": "...", "refresh_token": "..."}',
+            height=120,
+        )
+
+        if st.button('Save Gmail Account', use_container_width=True):
+            token_value = pasted_token.strip()
+            if uploaded_token is not None:
+                token_value = uploaded_token.getvalue().decode('utf-8')
+
+            try:
+                set_session_gmail_token(token_value)
+            except Exception as exc:
+                st.error(str(exc))
+            else:
+                st.success('Gmail account added. Click Refresh Inbox to import messages.')
+                st.rerun()
+
     if st.button('Use Different Gmail Account', use_container_width=True):
-        removed = reset_local_gmail_token()
+        removed_session = clear_session_gmail_token()
+        removed_local = reset_local_gmail_token()
+        removed = removed_session or removed_local
         if removed:
             st.success('Gmail account disconnected. Click Refresh Inbox to sign in again.')
         else:

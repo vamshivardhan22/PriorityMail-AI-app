@@ -199,19 +199,27 @@ def render_gmail_account_controls():
         )
         return
 
-    with st.expander('Add Gmail Account', expanded=not account['configured']):
+    if account['configured']:
+        st.caption(
+            'To use another Gmail account, add the token.json for that account below.'
+        )
+
+    with st.expander('Add or Switch Gmail Account', expanded=True):
+        st.caption(
+            'Upload or paste the token.json for the Gmail account you want this app to use.'
+        )
         uploaded_token = st.file_uploader(
-            'Upload token.json',
+            'Upload Gmail token.json',
             type='json',
             accept_multiple_files=False,
         )
         pasted_token = st.text_area(
-            'Or paste token JSON',
+            'Or paste Gmail token JSON',
             placeholder='{"token": "...", "refresh_token": "..."}',
             height=120,
         )
 
-        if st.button('Save Gmail Account', use_container_width=True):
+        if st.button('Save / Switch Gmail Account', use_container_width=True):
             token_value = pasted_token.strip()
             if uploaded_token is not None:
                 token_value = uploaded_token.getvalue().decode('utf-8')
@@ -221,15 +229,15 @@ def render_gmail_account_controls():
             except Exception as exc:
                 st.error(str(exc))
             else:
-                st.success('Gmail account added. Click Refresh Inbox to import messages.')
+                st.success('Gmail account saved. Click Refresh Inbox to import messages.')
                 st.rerun()
 
-    if st.button('Use Different Gmail Account', use_container_width=True):
+    if st.button('Disconnect Current Gmail Account', use_container_width=True):
         removed_session = clear_session_gmail_token()
         removed_local = reset_local_gmail_token()
         removed = removed_session or removed_local
         if removed:
-            st.success('Gmail account disconnected. Click Refresh Inbox to sign in again.')
+            st.success('Gmail account disconnected. Add another account above or click Refresh Inbox to sign in again.')
         else:
             st.info('No saved Gmail account was found. Click Refresh Inbox to sign in.')
         st.rerun()
